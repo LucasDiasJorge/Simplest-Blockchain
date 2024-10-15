@@ -41,7 +41,7 @@ fn main() {
 ## Future Improvements
 
 - Implement a **cryptographic hash** function such as SHA-256 for better security.
-- Add **proof-of-work** for block mining to simulate more realistic blockchain behavior.
+- Add **proof-of-work** for block mining to simulate more realistic blockchain behavior. (Done)
 - Improve the validation process with more robust checks and error handling.
 
 _[ref](https://aws.amazon.com/what-is/blockchain/)_
