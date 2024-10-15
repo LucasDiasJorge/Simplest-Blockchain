@@ -1,4 +1,8 @@
 use std::time::{SystemTime, UNIX_EPOCH};
+use futures::StreamExt;
+use rdkafka::consumer::{Consumer, StreamConsumer};
+use rdkafka::message::BorrowedMessage;
+use rdkafka::{ClientConfig, Message};
 
 #[derive(Debug, Clone)]
 struct Block {
@@ -83,26 +87,53 @@ impl Blockchain {
     }
 }
 
-fn main() {
+async fn handle_message(msg: BorrowedMessage<'_>, blockchain: &mut Blockchain) {
+    let payload = match msg.payload_view::<str>() {
+        Some(Ok(payload)) => payload,
+        Some(Err(_)) => "<payload is not utf-8>",
+        None => "<payload is empty>",
+    };
 
-    /*
-    let mut block0 :Block = Block::new(0, 0, String::from("block0"));
-    let mut block1 :Block = Block::new(1, 1, String::from("block1"));
-    let mut block2 :Block = Block::new(2, 2, String::from("block2"));
-    let mut block3 :Block = Block::new(3, 3, String::from("block3"));
-    println!("block0: {}", block0.hash);
-    println!("block1: {}", block1.hash);
-    println!("block2: {}", block2.hash);
-    println!("block3: {}", block3.hash);
-    */
+    let topic = msg.topic();
+    let partition = msg.partition();
+    let offset = msg.offset();
+
+    blockchain.add_block(payload.to_string());
+
+    println!(
+        "Received: topic: {}, partition: {}, offset: {}, payload: {}",
+        topic, partition, offset, payload
+    );
+}
+
+#[tokio::main]
+async fn main() {
+
+    // Kafka Consumer Config
+    let consumer: StreamConsumer = ClientConfig::new()
+        .set("group.id", "rust-kafka-consumer")
+        .set("bootstrap.servers", "localhost:9092")
+        .set("enable.partition.eof", "false")
+        .set("session.timeout.ms", "6000")
+        .set("enable.auto.commit", "true")
+        .create()
+        .expect("Consumer creation failed");
+
+    consumer.subscribe(&["my-topic"]).expect("Can't subscribe to specified topics");
+
+    println!("Waiting messages ...");
+
+    let mut message_stream = consumer.stream();
 
     let mut blockchain = Blockchain::new();
 
-    blockchain.add_block("Block 1 - MORE 10 BTC".to_string());
-    blockchain.add_block("block 2 - LESS 5 BTC".to_string());
-
-    blockchain.print();
-    
-    println!("Is Blockchain valid ? {}", blockchain.is_valid());
+    while let Some(message) = message_stream.next().await {
+        match message {
+            Ok(borrowed_message) => handle_message(borrowed_message, &mut blockchain).await,
+            Err(e) => eprintln!("Kafka error: {}", e),
+        }
+        blockchain.print();
+        println!("Is Blockchain valid ? {}", blockchain.is_valid());
+    }
 
 }
