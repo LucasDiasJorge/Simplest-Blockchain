@@ -12,7 +12,7 @@ impl Blockchain {
     }
 
     fn create_genesis_block() -> Block {
-        Block::new(0, 0, String::from("Genesis Block"))
+        Block::new(0, "0".to_string(), String::from("Genesis Block"))
     }
 
     pub fn add_block(&mut self, data: String) {
@@ -29,7 +29,7 @@ impl Blockchain {
             if current_block.hash != Block::calculate_hash(
                 current_block.index,
                 current_block.timestamp,
-                current_block.previous_hash,
+                &*current_block.previous_hash,
                 &current_block.data,
             ) {
                 return false;
